@@ -1,0 +1,94 @@
+.user-profile {
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 12px;
+  padding: 1.5rem;
+  margin-bottom: 2rem;
+}
+
+.user-profile h3 {
+  font-size: 1.3rem;
+  margin-bottom: 1rem;
+  color: #fff;
+}
+
+.profile-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 1rem;
+  margin-bottom: 1rem;
+}
+
+.profile-tag {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  background: rgba(102, 126, 234, 0.1);
+  border: 1px solid rgba(102, 126, 234, 0.3);
+  padding: 0.5rem 1rem;
+  border-radius: 20px;
+  font-size: 0.95rem;
+}
+
+.tag-icon {
+  font-size: 1.2rem;
+}
+
+.tag-label {
+  color: #999;
+  font-size: 0.85rem;
+}
+
+.tag-value {
+  color: #fff;
+  font-weight: 600;
+}
+
+.previous-books {
+  padding-top: 1rem;
+  border-top: 1px solid rgba(255, 255, 255, 0.1);
+  font-size: 0.95rem;
+}
+
+.books-label {
+  color: #999;
+  margin-right: 0.5rem;
+}
+
+.books-list {
+  color: #b8b8ff;
+}
+
+@media (prefers-color-scheme: light) {
+  .user-profile {
+    background: white;
+    border-color: #e0e0e0;
+  }
+
+  .user-profile h3 {
+    color: #213547;
+  }
+
+  .profile-tag {
+    background: #f0f0ff;
+    border-color: #667eea;
+  }
+
+  .tag-value {
+    color: #213547;
+  }
+
+  .books-list {
+    color: #5a5aff;
+  }
+}
+
+@media (max-width: 768px) {
+  .profile-tags {
+    flex-direction: column;
+  }
+
+  .profile-tag {
+    width: 100%;
+  }
+}
