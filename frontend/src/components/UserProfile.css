@@ -12,6 +12,12 @@
   color: #fff;
 }
 
+.profile-summary {
+  margin: 0 0 1rem;
+  color: rgba(255, 255, 255, 0.75);
+  line-height: 1.5;
+}
+
 .profile-tags {
   display: flex;
   flex-wrap: wrap;
@@ -35,28 +41,15 @@
 }
 
 .tag-label {
-  color: #999;
-  font-size: 0.85rem;
+  color: rgba(255, 255, 255, 0.7);
+  font-size: 0.8rem;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
 }
 
 .tag-value {
   color: #fff;
   font-weight: 600;
-}
-
-.previous-books {
-  padding-top: 1rem;
-  border-top: 1px solid rgba(255, 255, 255, 0.1);
-  font-size: 0.95rem;
-}
-
-.books-label {
-  color: #999;
-  margin-right: 0.5rem;
-}
-
-.books-list {
-  color: #b8b8ff;
 }
 
 @media (prefers-color-scheme: light) {
@@ -78,8 +71,8 @@
     color: #213547;
   }
 
-  .books-list {
-    color: #5a5aff;
+  .profile-summary {
+    color: #4a4a66;
   }
 }
 

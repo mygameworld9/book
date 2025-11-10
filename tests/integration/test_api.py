@@ -22,9 +22,9 @@ class TestRootEndpoint:
         response = client.get("/")
         assert response.status_code == 200
         data = response.json()
-        assert "message" in data
-        assert "docs" in data
-        assert "health" in data
+        assert data["message"] == "Multi-Theme Recommendation API"
+        assert "themes" in data and "books" in data["themes"]
+        assert "/api/books/recommend" in data["endpoints"].values()
 
 
 @pytest.mark.skip(reason="Requires OpenAI API key")
@@ -38,41 +38,40 @@ class TestRecommendationEndpoint:
     ) -> None:
         """Test recommendation endpoint returns valid response."""
         response = client.post(
-            "/api/v1/recommendations",
+            "/api/books/recommend",
             json=sample_recommendation_request,
         )
         assert response.status_code == 200
         data = response.json()
 
         # Verify response structure
+        assert data["theme"] == "books"
         assert "user_profile" in data
-        assert "recommended_books" in data
+        assert "recommendations" in data
         assert "message" in data
 
         # Verify user profile
         profile = data["user_profile"]
-        assert "genre" in profile
-        assert "style" in profile
-        assert "mood" in profile
-        assert "reading_goal" in profile
+        assert profile["theme"] == "books"
+        assert isinstance(profile["attributes"], dict)
 
         # Verify books
-        books = data["recommended_books"]
-        assert len(books) >= 2
-        assert len(books) <= 3
+        items = data["recommendations"]
+        assert len(items) >= 2
+        assert len(items) <= 3
 
-        for book in books:
-            assert "title" in book
-            assert "author" in book
-            assert "summary" in book
-            assert "recommendation_reason" in book
+        for item in items:
+            assert "title" in item
+            assert "creator" in item
+            assert "summary" in item
+            assert "reason" in item
 
     def test_recommendation_endpoint_invalid_request(
         self, client: TestClient
     ) -> None:
         """Test recommendation endpoint with invalid request."""
         response = client.post(
-            "/api/v1/recommendations",
+            "/api/books/recommend",
             json={},  # Missing required fields
         )
         assert response.status_code == 422  # Validation error

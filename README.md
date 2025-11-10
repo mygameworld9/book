@@ -1,24 +1,26 @@
-# 📚 Book Recommendation System
+# 🌌 Multi-Theme Recommendation System
 
-Multi-agent book recommendation system built with LangChain, FastAPI, and React.
+Multi-agent recommendation platform built with LangChain + FastAPI + React, covering **books, games, movies, and anime**.
 
 ## ✨ Features
 
-- 🤖 **Multi-Agent AI System**: Four specialized agents working collaboratively
-- 💬 **Interactive Chat Interface**: Conversational book recommendation experience
+- 🌗 **4 Themes, 1 Framework**: Books / Games / Movies / Anime share the same four-agent workflow
+- 🤖 **Multi-Agent AI System**: Selector · Essence Extractor · Insight Provider · Assembler
+- 💬 **Interactive Chat Interface**: Theme-aware prompts, history-aware chat, instant resets
 - 📱 **Responsive Design**: Works seamlessly on desktop and mobile
 - 🎨 **Beautiful UI**: Modern, gradient-styled recommendation cards
+- 🔀 **Instant Theme Switching**: Custom navigation without extra dependencies
 - ⚡ **Fast Performance**: Optimized with Vite and React 18
 - 🐳 **Docker Ready**: Complete Docker Compose setup for easy deployment
 
 ## 🏗️ Architecture
 
-This system uses four specialized AI agents working collaboratively to provide personalized book recommendations:
+Each theme uses the same four collaborating agents with theme-specific prompts loaded from `src/prompts/<theme>/<role>.txt`:
 
-1. **The Selector (文学向导)** - User interaction and coordination
-2. **The Essence Extractor (摘要撰写者)** - Book summary generation
-3. **The Insight Provider (图书推荐人)** - Personalized recommendation reasoning
-4. **The Assembler (在线图书管理员)** - Information integration and formatting
+1. **Selector (向导)** – Understands user intent, builds profiles, and picks candidates
+2. **Essence Extractor (简介撰写者)** – Generates neutral summaries
+3. **Insight Provider (推荐人)** – Creates concise, value-driven reasons
+4. **Assembler (管理员)** – Validates completeness and assembles final cards
 
 ## Setup
 
@@ -58,9 +60,58 @@ REDIS_DB=0
 # API Configuration
 API_HOST=0.0.0.0
 API_PORT=8000
+
+# Frontend
+VITE_API_BASE_URL=http://localhost:8000
 ```
 
+> Vite dev/build 过程中会自动读取仓库根目录 `.env` 里的 `VITE_` 变量，因此你只需维护一个 `.env` 文件即可让前后端共享 API 地址。如需前端单独覆盖，可在 `frontend/.env.local` 写入新的 `VITE_API_BASE_URL`。
+
 ## Development
+
+### API Endpoints
+
+```
+POST /api/books/recommend
+POST /api/games/recommend
+POST /api/movies/recommend
+POST /api/anime/recommend
+```
+
+All endpoints accept the unified payload:
+
+```json
+{
+  "user_message": "...",
+  "conversation_history": [
+    {"role": "user", "content": "..."},
+    {"role": "assistant", "content": "..."}
+  ]
+}
+```
+
+Response schema:
+
+```json
+{
+  "theme": "books",
+  "user_profile": {
+    "theme": "books",
+    "summary": "偏好描述",
+    "attributes": { "类型": ["科幻"], "心情": "探索" }
+  },
+  "recommendations": [
+    {
+      "title": "沙丘",
+      "creator": "弗兰克·赫伯特",
+      "metadata": {"年份": "1965", "类型": "科幻"},
+      "summary": "……",
+      "reason": "……"
+    }
+  ],
+  "message": "友好提示"
+}
+```
 
 ### Run Backend
 
@@ -137,25 +188,23 @@ Once the server is running, visit:
 
 ```
 .
-├── src/                 # Backend (FastAPI + LangChain)
-│   ├── agents/          # LangChain agent implementations
-│   ├── models/          # Pydantic data models
-│   ├── services/        # Business logic
-│   ├── utils/           # Utility functions
-│   └── main.py          # FastAPI application
-├── frontend/            # Frontend (React + Vite)
+├── src/                          # Backend (FastAPI + LangChain)
+│   ├── agents/                  # Theme-aware agents
+│   ├── models/                  # Unified request/response models
+│   ├── prompts/{theme}/{role}.txt
+│   ├── services/                # Agent orchestration
+│   └── main.py                  # FastAPI application + routes
+├── frontend/                    # Frontend (React + Vite)
 │   ├── src/
-│   │   ├── components/  # React components
-│   │   ├── services/    # API client
-│   │   └── test/        # Frontend tests
-│   ├── Dockerfile       # Frontend Docker image
-│   └── nginx.conf       # Nginx configuration
-├── tests/               # Backend tests
-│   ├── unit/            # Unit tests
-│   └── integration/     # Integration tests
-├── docs/                # Project documentation
-├── scripts/             # Utility scripts
-└── docker-compose.yml   # Complete stack orchestration
+│   │   ├── components/          # Theme selector, cards, chat
+│   │   ├── hooks/               # useThemeRouting, useRecommendation
+│   │   ├── constants/themes.js  # Theme metadata
+│   │   └── test/                # RTL + Vitest
+│   ├── Dockerfile               # Frontend build
+│   └── nginx.conf
+├── tests/                       # Backend tests (pytest + httpx)
+├── docs/                        # Project documentation
+└── docker-compose.yml           # Complete stack orchestration
 ```
 
 ## License

@@ -1,14 +1,19 @@
 """Base agent class for all recommendation agents."""
 
+from __future__ import annotations
+
 import logging
+from pathlib import Path
 from typing import Any
 
 from langchain_core.language_models import BaseChatModel
 from langchain_openai import ChatOpenAI
 
 from src.config import settings
+from src.models.recommendation import ThemeLiteral
 
 logger = logging.getLogger(__name__)
+PROMPTS_DIR = Path(__file__).resolve().parents[1] / "prompts"
 
 
 class BaseAgent:
@@ -16,6 +21,8 @@ class BaseAgent:
 
     def __init__(
         self,
+        *,
+        theme: ThemeLiteral,
         api_key: str | None = None,
         api_base: str | None = None,
         model: str | None = None,
@@ -24,18 +31,25 @@ class BaseAgent:
         """Initialize the agent with LLM configuration.
 
         Args:
+            theme: Current recommendation theme
             api_key: OpenAI API key (defaults to settings)
             api_base: OpenAI API base URL (defaults to settings)
             model: Model name (defaults to settings)
             temperature: Temperature for generation (defaults to settings)
         """
+        self.theme = theme
         self.api_key = api_key or settings.openai_api_key
         self.api_base = api_base or settings.openai_api_base
         self.model_name = model or settings.openai_model
         self.temperature = temperature or settings.openai_temperature
 
         self.llm = self._create_llm()
-        logger.info(f"Initialized {self.__class__.__name__} with model {self.model_name}")
+        logger.info(
+            "Initialized %s for theme=%s with model=%s",
+            self.__class__.__name__,
+            self.theme,
+            self.model_name,
+        )
 
     def _create_llm(self) -> BaseChatModel:
         """Create and configure the LLM instance.
@@ -49,6 +63,22 @@ class BaseAgent:
             model=self.model_name,
             temperature=self.temperature,
         )
+
+    def load_prompt(self, role: str) -> str:
+        """Load the system prompt for the given role and theme.
+
+        Args:
+            role: Agent role name, e.g., selector, extractor
+
+        Returns:
+            Prompt content as string
+        """
+        prompt_path = PROMPTS_DIR / self.theme / f"{role}.txt"
+        if not prompt_path.exists():
+            raise FileNotFoundError(
+                f"Prompt file not found for theme={self.theme}, role={role}"
+            )
+        return prompt_path.read_text(encoding="utf-8")
 
     async def process(self, *args: Any, **kwargs: Any) -> Any:
         """Process the agent's task.

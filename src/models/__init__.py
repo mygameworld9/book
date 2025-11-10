@@ -1,12 +1,21 @@
-"""Data models for the book recommendation system."""
+"""Data models for the recommendation system."""
 
-from src.models.book import Book, BookCandidate, UserProfile
-from src.models.recommendation import RecommendationCard, RecommendationRequest
+from src.models.recommendation import (
+    ConversationMessage,
+    RecommendationCard,
+    RecommendationCandidate,
+    RecommendationRequest,
+    RecommendationResponse,
+    ThemeLiteral,
+    UserProfile,
+)
 
 __all__ = [
-    "Book",
-    "BookCandidate",
-    "UserProfile",
+    "ConversationMessage",
     "RecommendationCard",
+    "RecommendationCandidate",
     "RecommendationRequest",
+    "RecommendationResponse",
+    "ThemeLiteral",
+    "UserProfile",
 ]

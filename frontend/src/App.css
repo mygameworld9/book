@@ -1,96 +1,75 @@
 .app {
   min-height: 100vh;
-  display: flex;
-  flex-direction: column;
-}
-
-.app-header {
-  text-align: center;
-  margin-bottom: 2rem;
-}
-
-.app-header h1 {
-  font-size: 2.5rem;
-  margin-bottom: 0.5rem;
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-  -webkit-background-clip: text;
-  -webkit-text-fill-color: transparent;
-  background-clip: text;
-}
-
-.subtitle {
-  font-size: 1.1rem;
-  color: #888;
-  margin-bottom: 2rem;
-}
-
-.app-main {
-  flex: 1;
+  padding: 2.5rem 1.5rem 2rem;
+  background: radial-gradient(circle at top, #2b2d68, #0f112d 65%);
+  color: #f4f5ff;
   display: flex;
   flex-direction: column;
   gap: 2rem;
 }
 
-.loading {
+.app-header {
+  max-width: 1200px;
+  margin: 0 auto;
   text-align: center;
-  padding: 3rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
 }
 
-.spinner {
-  width: 50px;
-  height: 50px;
-  margin: 0 auto 1rem;
-  border: 4px solid #f3f3f3;
-  border-top: 4px solid #646cff;
-  border-radius: 50%;
-  animation: spin 1s linear infinite;
+.app-header h1 {
+  font-size: 2.7rem;
+  margin: 0;
+  color: #fff;
 }
 
-@keyframes spin {
-  0% {
-    transform: rotate(0deg);
-  }
-  100% {
-    transform: rotate(360deg);
-  }
+.app-header h1 span {
+  font-size: 2rem;
+  color: rgba(255, 255, 255, 0.75);
+  margin-left: 0.5rem;
 }
 
-.error {
-  background-color: #ff4444;
-  color: white;
-  padding: 1.5rem;
-  border-radius: 12px;
-  text-align: center;
+.eyebrow {
+  text-transform: uppercase;
+  letter-spacing: 0.2rem;
+  font-size: 0.85rem;
+  color: rgba(255, 255, 255, 0.6);
+  margin: 0;
 }
 
-.error h3 {
-  margin-bottom: 0.5rem;
+.subtitle {
+  margin: 0 auto 0.5rem;
+  max-width: 720px;
+  color: rgba(255, 255, 255, 0.7);
 }
 
 .app-footer {
   text-align: center;
-  padding: 2rem 0;
-  margin-top: 3rem;
-  border-top: 1px solid #333;
-  color: #888;
-  font-size: 0.9rem;
+  padding: 1.5rem 0;
+  border-top: 1px solid rgba(255, 255, 255, 0.1);
+  color: rgba(255, 255, 255, 0.6);
+  font-size: 0.95rem;
 }
 
 .app-footer a {
-  color: #646cff;
-  text-decoration: none;
-}
-
-.app-footer a:hover {
+  color: #fff;
   text-decoration: underline;
 }
 
+.app-footer a:hover {
+  opacity: 0.9;
+}
+
 @media (max-width: 768px) {
-  .app-header h1 {
-    font-size: 2rem;
+  .app {
+    padding: 1.5rem 1rem;
   }
 
-  .subtitle {
-    font-size: 1rem;
+  .app-header h1 {
+    font-size: 2.1rem;
+  }
+
+  .app-header h1 span {
+    font-size: 1.4rem;
   }
 }

@@ -1,3 +1,3 @@
-"""Book recommendation system using multi-agent LangChain architecture."""
+"""Multi-theme recommendation system using a multi-agent LangChain architecture."""
 
-__version__ = "0.1.0"
+__version__ = "0.2.0"

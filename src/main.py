@@ -1,15 +1,21 @@
-"""FastAPI application for book recommendation service."""
+"""FastAPI application for the multi-theme recommendation service."""
+
+from __future__ import annotations
 
 import logging
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import JSONResponse
 
 from src.config import settings, setup_logging
-from src.models.recommendation import RecommendationCard, RecommendationRequest
-from src.services.recommendation_service import RecommendationService
+from src.models.recommendation import RecommendationRequest, RecommendationResponse
+from src.services.recommendation_service import (
+    SUPPORTED_THEMES,
+    RecommendationService,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -26,20 +32,20 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     """
     # Startup
     setup_logging(settings.log_level)
-    logger.info("Starting Book Recommendation Service")
+    logger.info("Starting Multi-Theme Recommendation Service")
     logger.info(f"Using model: {settings.openai_model}")
     logger.info(f"API base: {settings.openai_api_base}")
 
     yield
 
     # Shutdown
-    logger.info("Shutting down Book Recommendation Service")
+    logger.info("Shutting down Multi-Theme Recommendation Service")
 
 
 app = FastAPI(
-    title="Book Recommendation API",
-    description="Multi-agent book recommendation system using LangChain",
-    version="0.1.0",
+    title="Multi-Theme Recommendation API",
+    description="Multi-agent recommendation system using LangChain",
+    version="0.2.0",
     lifespan=lifespan,
 )
 
@@ -57,16 +63,20 @@ recommendation_service = RecommendationService()
 
 
 @app.get("/")
-async def root() -> dict[str, str]:
+async def root() -> dict[str, object]:
     """Root endpoint.
 
     Returns:
         Welcome message
     """
     return {
-        "message": "Book Recommendation API",
+        "message": "Multi-Theme Recommendation API",
         "docs": "/docs",
         "health": "/health",
+        "themes": list(SUPPORTED_THEMES),
+        "endpoints": {
+            theme: f"/api/{theme}/recommend" for theme in SUPPORTED_THEMES
+        },
     }
 
 
@@ -80,53 +90,81 @@ async def health() -> dict[str, str]:
     return {"status": "healthy"}
 
 
-@app.post("/api/v1/recommendations", response_model=RecommendationCard)
-async def get_recommendations(request: RecommendationRequest) -> RecommendationCard:
-    """Get book recommendations based on user input.
+async def _generate_recommendation(
+    theme: str, request: RecommendationRequest
+) -> RecommendationResponse:
+    if theme not in SUPPORTED_THEMES:
+        raise HTTPException(status_code=404, detail=f"Unsupported theme: {theme}")
 
-    This endpoint coordinates multiple AI agents to provide personalized
-    book recommendations:
-    1. Selector: Understands user needs and selects candidates
-    2. EssenceExtractor: Generates book summaries
-    3. InsightProvider: Creates personalized recommendation reasons
-    4. Assembler: Integrates all information
-
-    Args:
-        request: User's recommendation request
-
-    Returns:
-        Recommendation card with 2-3 books
-
-    Raises:
-        HTTPException: If recommendation generation fails
-    """
     try:
-        logger.info("Received recommendation request")
-        recommendation = await recommendation_service.get_recommendations(request)
-        logger.info("Successfully generated recommendations")
-        return recommendation
+        return await recommendation_service.get_recommendations(theme, request)
+    except ValueError as exc:
+        logger.error("Validation error while generating recommendations: %s", exc)
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    except Exception as exc:  # noqa: BLE001
+        logger.error("Failed to generate recommendations: %s", exc, exc_info=True)
+        raise HTTPException(status_code=500, detail="Recommendation generation failed") from exc
 
-    except Exception as e:
-        logger.error(f"Failed to generate recommendations: {e}", exc_info=True)
-        raise HTTPException(
-            status_code=500,
-            detail=f"Failed to generate recommendations: {str(e)}",
-        ) from e
+
+@app.post("/api/books/recommend", response_model=RecommendationResponse)
+async def recommend_books(request: RecommendationRequest) -> RecommendationResponse:
+    """Recommendation endpoint for books theme."""
+    return await _generate_recommendation("books", request)
+
+
+@app.post("/api/games/recommend", response_model=RecommendationResponse)
+async def recommend_games(request: RecommendationRequest) -> RecommendationResponse:
+    """Recommendation endpoint for games theme."""
+    return await _generate_recommendation("games", request)
+
+
+@app.post("/api/movies/recommend", response_model=RecommendationResponse)
+async def recommend_movies(request: RecommendationRequest) -> RecommendationResponse:
+    """Recommendation endpoint for movies theme."""
+    return await _generate_recommendation("movies", request)
+
+
+@app.post("/api/anime/recommend", response_model=RecommendationResponse)
+async def recommend_anime(request: RecommendationRequest) -> RecommendationResponse:
+    """Recommendation endpoint for anime theme."""
+    return await _generate_recommendation("anime", request)
+
+
+@app.exception_handler(HTTPException)
+async def http_exception_handler(
+    request: Request, exc: HTTPException
+) -> JSONResponse:
+    """Format HTTP exceptions into a standard JSON schema."""
+    return JSONResponse(
+        status_code=exc.status_code,
+        content={
+            "error": {
+                "type": "http_error",
+                "message": exc.detail,
+                "status_code": exc.status_code,
+                "path": request.url.path,
+            }
+        },
+    )
 
 
 @app.exception_handler(Exception)
-async def global_exception_handler(request: object, exc: Exception) -> dict[str, str]:
-    """Global exception handler for unhandled errors.
-
-    Args:
-        request: The request object
-        exc: The exception that was raised
-
-    Returns:
-        Error response
-    """
-    logger.error(f"Unhandled exception: {exc}", exc_info=True)
-    return {"error": "Internal server error", "detail": str(exc)}
+async def global_exception_handler(
+    request: Request, exc: Exception
+) -> JSONResponse:
+    """Global exception handler for unhandled errors."""
+    logger.error("Unhandled exception: %s", exc, exc_info=True)
+    return JSONResponse(
+        status_code=500,
+        content={
+            "error": {
+                "type": "server_error",
+                "message": "Internal server error",
+                "status_code": 500,
+                "path": request.url.path,
+            }
+        },
+    )
 
 
 if __name__ == "__main__":

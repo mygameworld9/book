@@ -1,96 +1,105 @@
-"""The Essence Extractor Agent - Book summary generation."""
+"""The Essence Extractor Agent - summary generation for all themes."""
+
+from __future__ import annotations
 
 import json
 import logging
+from typing import Any
 
 from langchain_core.messages import HumanMessage, SystemMessage
 
 from src.agents.base import BaseAgent
-from src.models.book import BookCandidate
+from src.models.recommendation import RecommendationCandidate, ThemeLiteral
 
 logger = logging.getLogger(__name__)
 
 
 class EssenceExtractorAgent(BaseAgent):
-    """摘要撰写者 (The Essence Extractor) - Generates concise book summaries."""
+    """提炼候选项目精髓的 Agent。"""
 
-    SYSTEM_PROMPT = """你是一位专业的摘要撰写者，擅长提炼书籍的核心精髓。
-
-你的职责：
-1. 接收候选书目列表
-2. 为每本书生成简洁、客观、清晰的摘要
-3. 识别书的核心主题、主要冲突和重要人物
-4. 避免过度剧透
-
-摘要要求：
-- 长度：约50-80字
-- 风格：客观、精练
-- 重点：核心主题和价值
-- 避免：剧透关键情节
-
-输出格式：
-返回JSON数组，每本书包含：
-{
-    "title": "书名",
-    "summary": "精髓摘要（50-80字）"
-}
-
-使用中文输出。"""
+    def __init__(self, *, theme: ThemeLiteral, **kwargs: Any) -> None:
+        super().__init__(theme=theme, **kwargs)
+        self.system_prompt = self.load_prompt("extractor")
 
     async def process(
-        self, candidates: list[BookCandidate]
+        self, candidates: list[RecommendationCandidate]
     ) -> dict[str, str]:
-        """Generate summaries for book candidates.
+        """Generate summaries for candidates.
 
         Args:
-            candidates: List of book candidates
+            candidates: List of candidates
 
         Returns:
-            Dictionary mapping book title to summary
+            Dictionary mapping item title to summary
         """
-        logger.info(f"EssenceExtractor processing {len(candidates)} candidates")
-
-        # Prepare book list
-        book_list = "\n".join(
-            [f"- {c.title} by {c.author}" for c in candidates]
+        logger.info(
+            "EssenceExtractor processing %s candidates for theme=%s",
+            len(candidates),
+            self.theme,
         )
 
+        payload = {
+            "theme": self.theme,
+            "candidates": [c.model_dump() for c in candidates],
+        }
+
         messages = [
-            SystemMessage(content=self.SYSTEM_PROMPT),
+            SystemMessage(content=self.system_prompt),
             HumanMessage(
-                content=f"""请为以下书籍生成摘要：
-
-{book_list}
-
-以JSON数组格式返回，每个元素包含 title 和 summary 字段。"""
+                content=(
+                    "请为以下候选内容生成简洁摘要，长度保持在50-80字：\n"
+                    f"{json.dumps(payload, ensure_ascii=False, indent=2)}\n\n"
+                    "只返回JSON数组或包含 summaries 字段的对象，每个元素包含 title 和 summary。"
+                )
             ),
         ]
 
         response = await self.llm.ainvoke(messages)
-        content = response.content
+        summaries = self._parse_summaries(response.content)
 
-        # Parse JSON response
-        try:
-            if isinstance(content, str):
-                if "```json" in content:
-                    content = content.split("```json")[1].split("```")[0].strip()
-                elif "```" in content:
-                    content = content.split("```")[1].split("```")[0].strip()
-
-                data = json.loads(content)
-            else:
-                raise ValueError("Unexpected response format")
-
-            # Create dictionary mapping title to summary
-            summaries = {item["title"]: item["summary"] for item in data}
-
-            logger.info(f"EssenceExtractor generated {len(summaries)} summaries")
-            return summaries
-
-        except (json.JSONDecodeError, KeyError, ValueError) as e:
-            logger.error(f"Failed to parse EssenceExtractor response: {e}")
-            # Fallback to default summaries
+        if not summaries:
+            logger.warning(
+                "EssenceExtractor failed to parse output, using fallback summaries"
+            )
             return {
-                c.title: f"这是一本由{c.author}撰写的优秀作品，值得一读。"
+                c.title: f"{c.title} 由 {c.creator} 创作，是值得一试的优质作品。"
                 for c in candidates
             }
+
+        logger.info("EssenceExtractor generated %s summaries", len(summaries))
+        return summaries
+
+    def _parse_summaries(self, content: Any) -> dict[str, str]:
+        if not isinstance(content, str):
+            return {}
+
+        text = content.strip()
+        if "```json" in text:
+            text = text.split("```json", maxsplit=1)[1].split("```", maxsplit=1)[0]
+        elif "```" in text:
+            text = text.split("```", maxsplit=1)[1].split("```", maxsplit=1)[0]
+
+        try:
+            data = json.loads(text)
+        except json.JSONDecodeError as exc:
+            logger.error("Failed to decode extractor JSON: %s", exc)
+            return {}
+
+        entries: list[dict[str, Any]]
+        if isinstance(data, dict) and "summaries" in data:
+            entries = data["summaries"]  # type: ignore[assignment]
+        elif isinstance(data, list):
+            entries = data  # type: ignore[assignment]
+        else:
+            return {}
+
+        result: dict[str, str] = {}
+        for item in entries:
+            if not isinstance(item, dict):
+                continue
+            title = str(item.get("title") or "").strip()
+            summary = str(item.get("summary") or "").strip()
+            if title and summary:
+                result[title] = summary
+
+        return result

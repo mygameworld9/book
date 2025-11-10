@@ -1,7 +1,10 @@
-"""Book recommendation service coordinating all agents."""
+"""Recommendation service coordinating multi-theme agent workflows."""
+
+from __future__ import annotations
 
 import asyncio
 import logging
+from dataclasses import dataclass
 
 from src.agents import (
     AssemblerAgent,
@@ -9,9 +12,24 @@ from src.agents import (
     InsightProviderAgent,
     SelectorAgent,
 )
-from src.models.recommendation import RecommendationCard, RecommendationRequest
+from src.models.recommendation import (
+    RecommendationRequest,
+    RecommendationResponse,
+    ThemeLiteral,
+)
 
 logger = logging.getLogger(__name__)
+SUPPORTED_THEMES: tuple[ThemeLiteral, ...] = ("books", "games", "movies", "anime")
+
+
+@dataclass(slots=True)
+class AgentBundle:
+    """Container for all four agents assigned to a theme."""
+
+    selector: SelectorAgent
+    extractor: EssenceExtractorAgent
+    insight: InsightProviderAgent
+    assembler: AssemblerAgent
 
 
 class RecommendationService:
@@ -23,29 +41,33 @@ class RecommendationService:
         api_base: str | None = None,
         model: str | None = None,
     ) -> None:
-        """Initialize the recommendation service.
+        """Initialize the recommendation service with agents per theme."""
+        self.agents: dict[ThemeLiteral, AgentBundle] = {}
 
-        Args:
-            api_key: OpenAI API key
-            api_base: OpenAI API base URL
-            model: Model name
-        """
-        self.selector = SelectorAgent(api_key=api_key, api_base=api_base, model=model)
-        self.essence_extractor = EssenceExtractorAgent(
-            api_key=api_key, api_base=api_base, model=model
-        )
-        self.insight_provider = InsightProviderAgent(
-            api_key=api_key, api_base=api_base, model=model
-        )
-        self.assembler = AssemblerAgent(
-            api_key=api_key, api_base=api_base, model=model
-        )
+        for theme in SUPPORTED_THEMES:
+            self.agents[theme] = AgentBundle(
+                selector=SelectorAgent(
+                    theme=theme, api_key=api_key, api_base=api_base, model=model
+                ),
+                extractor=EssenceExtractorAgent(
+                    theme=theme, api_key=api_key, api_base=api_base, model=model
+                ),
+                insight=InsightProviderAgent(
+                    theme=theme, api_key=api_key, api_base=api_base, model=model
+                ),
+                assembler=AssemblerAgent(
+                    theme=theme, api_key=api_key, api_base=api_base, model=model
+                ),
+            )
 
-        logger.info("RecommendationService initialized with all agents")
+        logger.info(
+            "RecommendationService initialized with themes: %s",
+            ", ".join(SUPPORTED_THEMES),
+        )
 
     async def get_recommendations(
-        self, request: RecommendationRequest
-    ) -> RecommendationCard:
+        self, theme: ThemeLiteral, request: RecommendationRequest
+    ) -> RecommendationResponse:
         """Process recommendation request through multi-agent workflow.
 
         Workflow:
@@ -54,38 +76,42 @@ class RecommendationService:
         3. Assembler: Integrate all information into final recommendation
 
         Args:
+            theme: Requested recommendation theme
             request: User's recommendation request
 
         Returns:
-            Complete recommendation card
+            Complete recommendation response
         """
-        logger.info("Starting recommendation workflow")
+        logger.info("Starting recommendation workflow for theme=%s", theme)
+        agents = self.agents.get(theme)
+        if not agents:
+            raise ValueError(f"Unsupported theme: {theme}")
 
-        # Step 1: Selector - Understand user and select candidates
-        user_profile, candidates, _ = await self.selector.process(
-            user_message=request.user_message,
-            conversation_history=request.conversation_history,
+        user_profile, candidates, selector_message = await agents.selector.process(
+            user_message=request.user_input,
+            conversation_history=[
+                msg.model_dump() for msg in request.conversation_history
+            ],
         )
 
         logger.info(
-            f"Selector identified {len(candidates)} candidates for user profile"
+            "Selector identified %s candidates for user profile", len(candidates)
         )
 
-        # Step 2: Run EssenceExtractor and InsightProvider in parallel
-        summaries_task = self.essence_extractor.process(candidates)
-        reasons_task = self.insight_provider.process(candidates, user_profile)
+        summaries_task = agents.extractor.process(candidates)
+        reasons_task = agents.insight.process(candidates, user_profile)
 
         summaries, reasons = await asyncio.gather(summaries_task, reasons_task)
 
-        logger.info("EssenceExtractor and InsightProvider completed")
+        logger.info("EssenceExtractor and InsightProvider completed for theme=%s", theme)
 
-        # Step 3: Assembler - Integrate all information
-        recommendation_card = await self.assembler.process(
+        recommendation_response = await agents.assembler.process(
             user_profile=user_profile,
             candidates=candidates,
             summaries=summaries,
             reasons=reasons,
+            intro_message=selector_message,
         )
 
-        logger.info("Recommendation workflow completed successfully")
-        return recommendation_card
+        logger.info("Recommendation workflow completed successfully for theme=%s", theme)
+        return recommendation_response

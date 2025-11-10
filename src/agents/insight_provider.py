@@ -1,110 +1,118 @@
 """The Insight Provider Agent - Personalized recommendation reasoning."""
 
+from __future__ import annotations
+
 import json
 import logging
+from typing import Any
 
 from langchain_core.messages import HumanMessage, SystemMessage
 
 from src.agents.base import BaseAgent
-from src.models.book import BookCandidate, UserProfile
+from src.models.recommendation import (
+    RecommendationCandidate,
+    ThemeLiteral,
+    UserProfile,
+)
 
 logger = logging.getLogger(__name__)
 
 
 class InsightProviderAgent(BaseAgent):
-    """图书推荐人 (The Insight Provider) - Generates personalized recommendations."""
+    """Theme-aware recommendation reason generator."""
 
-    SYSTEM_PROMPT = """你是一位见解独到的图书推荐人，专注于生成极具说服力的推荐理由。
-
-你的职责：
-1. 接收候选书目和用户画像
-2. 将书目特点与用户需求进行关联匹配
-3. 为每本书撰写"为什么你应该读它"的理由
-
-推荐理由要求：
-- 长度：约30-50字
-- 风格：主观、有感染力
-- 重点：如何满足用户特定需求
-- 价值：解决用户的阅读目的
-
-输出格式：
-返回JSON数组，每本书包含：
-{
-    "title": "书名",
-    "recommendation_reason": "推荐理由（30-50字）"
-}
-
-使用中文输出，语气要热情且专业。"""
+    def __init__(self, *, theme: ThemeLiteral, **kwargs: Any) -> None:
+        super().__init__(theme=theme, **kwargs)
+        self.system_prompt = self.load_prompt("insight")
 
     async def process(
-        self, candidates: list[BookCandidate], user_profile: UserProfile
+        self,
+        candidates: list[RecommendationCandidate],
+        user_profile: UserProfile,
     ) -> dict[str, str]:
         """Generate personalized recommendation reasons.
 
         Args:
-            candidates: List of book candidates
-            user_profile: User's reading profile
+            candidates: Candidate items
+            user_profile: Structured user profile
 
         Returns:
-            Dictionary mapping book title to recommendation reason
+            Mapping of item title to recommendation reason
         """
         logger.info(
-            f"InsightProvider processing {len(candidates)} candidates for user profile"
+            "InsightProvider processing %s candidates for theme=%s",
+            len(candidates),
+            self.theme,
         )
 
-        # Prepare book list and profile
-        book_list = "\n".join(
-            [f"- {c.title} by {c.author}" for c in candidates]
-        )
-
-        profile_str = f"""用户画像：
-- 偏好类型：{user_profile.genre}
-- 阅读风格：{user_profile.style}
-- 当前心情：{user_profile.mood}
-- 阅读目的：{user_profile.reading_goal}
-- 已读书籍：{', '.join(user_profile.previous_books) if user_profile.previous_books else '无'}"""
+        profile_payload = user_profile.model_dump()
+        payload = {
+            "theme": self.theme,
+            "user_profile": profile_payload,
+            "candidates": [c.model_dump() for c in candidates],
+        }
 
         messages = [
-            SystemMessage(content=self.SYSTEM_PROMPT),
+            SystemMessage(content=self.system_prompt),
             HumanMessage(
-                content=f"""请根据用户画像，为以下书籍生成个性化推荐理由：
-
-{profile_str}
-
-书籍列表：
-{book_list}
-
-以JSON数组格式返回，每个元素包含 title 和 recommendation_reason 字段。"""
+                content=(
+                    "请基于以下用户画像与候选内容，生成30-50字的个性化推荐理由：\n"
+                    f"{json.dumps(payload, ensure_ascii=False, indent=2)}\n\n"
+                    "仅返回JSON数组或包含 reasons 字段的对象，字段名为 "
+                    'title 与 recommendation_reason。'
+                )
             ),
         ]
 
         response = await self.llm.ainvoke(messages)
-        content = response.content
+        reasons = self._parse_reasons(response.content)
 
-        # Parse JSON response
-        try:
-            if isinstance(content, str):
-                if "```json" in content:
-                    content = content.split("```json")[1].split("```")[0].strip()
-                elif "```" in content:
-                    content = content.split("```")[1].split("```")[0].strip()
-
-                data = json.loads(content)
-            else:
-                raise ValueError("Unexpected response format")
-
-            # Create dictionary mapping title to reason
-            reasons = {
-                item["title"]: item["recommendation_reason"] for item in data
-            }
-
-            logger.info(f"InsightProvider generated {len(reasons)} recommendations")
-            return reasons
-
-        except (json.JSONDecodeError, KeyError, ValueError) as e:
-            logger.error(f"Failed to parse InsightProvider response: {e}")
-            # Fallback to default reasons
+        if not reasons:
+            logger.warning("InsightProvider response empty, using fallback reasons")
             return {
-                c.title: "这本书非常适合您当前的阅读需求，推荐阅读。"
+                c.title: "这项推荐与您的偏好高度契合，值得体验。"
                 for c in candidates
             }
+
+        logger.info("InsightProvider generated %s recommendation reasons", len(reasons))
+        return reasons
+
+    def _parse_reasons(self, content: Any) -> dict[str, str]:
+        if not isinstance(content, str):
+            return {}
+
+        text = content.strip()
+        if "```json" in text:
+            text = text.split("```json", maxsplit=1)[1].split("```", maxsplit=1)[0]
+        elif "```" in text:
+            text = text.split("```", maxsplit=1)[1].split("```", maxsplit=1)[0]
+
+        try:
+            data = json.loads(text)
+        except json.JSONDecodeError as exc:
+            logger.error("Failed to decode insight JSON: %s", exc)
+            return {}
+
+        entries: list[dict[str, Any]]
+        if isinstance(data, dict) and "reasons" in data:
+            entries = data["reasons"]  # type: ignore[assignment]
+        elif isinstance(data, list):
+            entries = data  # type: ignore[assignment]
+        else:
+            return {}
+
+        result: dict[str, str] = {}
+        for item in entries:
+            if not isinstance(item, dict):
+                continue
+            title = str(item.get("title") or "").strip()
+            reason = (
+                item.get("recommendation_reason")
+                or item.get("reason")
+                or item.get("insight")
+            )
+            reason_str = str(reason).strip() if reason else ""
+            if title and reason_str:
+                result[title] = reason_str
+
+        return result

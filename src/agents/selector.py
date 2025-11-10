@@ -1,46 +1,39 @@
 """The Selector Agent - User interaction and coordination."""
 
+from __future__ import annotations
+
 import json
 import logging
+from typing import Any
 
 from langchain_core.messages import HumanMessage, SystemMessage
 
 from src.agents.base import BaseAgent
-from src.models.book import BookCandidate, UserProfile
+from src.models.recommendation import RecommendationCandidate, ThemeLiteral, UserProfile
 
 logger = logging.getLogger(__name__)
 
+THEME_LABELS: dict[ThemeLiteral, str] = {
+    "books": "书籍",
+    "games": "游戏",
+    "movies": "电影",
+    "anime": "动漫",
+}
+
 
 class SelectorAgent(BaseAgent):
-    """文学向导 (The Selector) - Handles user interaction and task coordination."""
+    """Theme-aware selector that orchestrates the first step."""
 
-    SYSTEM_PROMPT = """你是一位专业的文学向导，负责与读者对话并理解他们的阅读需求。
-
-你的职责：
-1. 通过提问深入了解用户的偏好、阅读历史、当前心情和阅读目的
-2. 基于对话生成用户画像标签
-3. 从内部数据库筛选出2-3本最匹配的候选书目
-
-提问技巧：
-- "您最近读过什么书？最喜欢哪本，为什么？"
-- "您现在的心情如何？是想放松、挑战自己还是学习新知识？"
-- "您喜欢什么类型的书？科幻、文学、历史还是其他？"
-- "您偏好什么样的阅读风格？轻松的、深度的还是硬核的？"
-
-输出格式要求：
-返回JSON格式，包含：
-1. user_profile: 用户画像对象
-2. candidates: 2-3本候选书目列表
-3. message: 给用户的友好回复
-
-保持专业、友好的语气，用中文回应。"""
+    def __init__(self, *, theme: ThemeLiteral, **kwargs: Any) -> None:
+        super().__init__(theme=theme, **kwargs)
+        self.system_prompt = self.load_prompt("selector")
 
     async def process(
         self,
         user_message: str,
         conversation_history: list[dict[str, str]] | None = None,
-    ) -> tuple[UserProfile, list[BookCandidate], str]:
-        """Process user message and generate profile with book candidates.
+    ) -> tuple[UserProfile, list[RecommendationCandidate], str]:
+        """Process user message and generate profile with candidates.
 
         Args:
             user_message: User's current message
@@ -49,81 +42,210 @@ class SelectorAgent(BaseAgent):
         Returns:
             Tuple of (user_profile, candidates, message_to_user)
         """
-        logger.info("Selector processing user message")
+        logger.info("Selector processing user message for theme=%s", self.theme)
 
         messages: list[SystemMessage | HumanMessage] = [
-            SystemMessage(content=self.SYSTEM_PROMPT)
+            SystemMessage(content=self.system_prompt)
         ]
 
-        # Add conversation history
         if conversation_history:
             for msg in conversation_history:
-                messages.append(HumanMessage(content=msg.get("content", "")))
+                role = msg.get("role", "user")
+                content = msg.get("content", "")
+                if not content:
+                    continue
+                messages.append(
+                    HumanMessage(content=f"{role.upper()}:\n{content}")
+                )
 
-        # Add current message
         messages.append(HumanMessage(content=user_message))
-
-        # Request structured output
-        messages.append(
-            HumanMessage(
-                content="""请以JSON格式回复，包含以下字段：
-{
-    "user_profile": {
-        "genre": "类型",
-        "style": "风格",
-        "mood": "心情",
-        "previous_books": ["书名1", "书名2"],
-        "reading_goal": "阅读目的"
-    },
-    "candidates": [
-        {"title": "书名", "author": "作者", "isbn": "ISBN或null"},
-        {"title": "书名", "author": "作者", "isbn": "ISBN或null"}
-    ],
-    "message": "给用户的友好回复"
-}"""
-            )
-        )
+        messages.append(HumanMessage(content=self._structure_prompt()))
 
         response = await self.llm.ainvoke(messages)
-        content = response.content
+        return self._parse_response(response.content)
 
-        # Parse JSON response
-        try:
-            # Extract JSON from response (handle markdown code blocks)
-            if isinstance(content, str):
-                if "```json" in content:
-                    content = content.split("```json")[1].split("```")[0].strip()
-                elif "```" in content:
-                    content = content.split("```")[1].split("```")[0].strip()
+    def _structure_prompt(self) -> str:
+        label = THEME_LABELS.get(self.theme, "推荐")
+        return f"""请针对 {label} 推荐以 JSON 格式回复，严格包含以下字段：
+{{
+  "user_profile": {{
+    "summary": "一句话总结（可选）",
+    "attributes": {{
+      "标签1": ["值1", "值2"],
+      "标签2": "值"
+    }}
+  }},
+  "candidates": [
+    {{
+      "title": "作品名称",
+      "creator": "主要创作者（作者/导演/开发商）",
+      "metadata": {{
+        "平台或年份等字段": "值"
+      }}
+    }}
+  ],
+  "message": "给用户的友好回复"
+}}
+请勿添加额外文本或解释。"""
 
-                data = json.loads(content)
+    def _parse_response(
+        self, content: Any
+    ) -> tuple[UserProfile, list[RecommendationCandidate], str]:
+        data = self._extract_json(content)
+        if not data:
+            return self._fallback()
+
+        profile = self._build_user_profile(data.get("user_profile", {}))
+        candidates = self._build_candidates(data.get("candidates", []))
+        message = str(data.get("message") or self._default_message())
+
+        if not candidates:
+            logger.warning(
+                "Selector returned no candidates for theme=%s, using fallback defaults",
+                self.theme,
+            )
+            return self._fallback()
+
+        logger.info(
+            "Selector generated profile (%s attrs) and %s candidates",
+            len(profile.attributes),
+            len(candidates),
+        )
+        return profile, candidates, message
+
+    def _build_user_profile(self, payload: Any) -> UserProfile:
+        summary = None
+        attributes: dict[str, Any] = {}
+
+        if isinstance(payload, dict):
+            summary = payload.get("summary")
+            attr_values = payload.get("attributes")
+            if isinstance(attr_values, dict):
+                attributes = attr_values
             else:
-                raise ValueError("Unexpected response format")
+                attributes = {
+                    key: value
+                    for key, value in payload.items()
+                    if key != "summary"
+                }
 
-            # Create models
-            user_profile = UserProfile(**data["user_profile"])
-            candidates = [BookCandidate(**c) for c in data["candidates"]]
-            message = data["message"]
+        normalized = {
+            str(key): self._normalize_value(value)
+            for key, value in attributes.items()
+        }
+        return UserProfile(theme=self.theme, summary=summary, attributes=normalized)
 
-            logger.info(
-                f"Selector generated profile and {len(candidates)} candidates"
+    def _build_candidates(self, payload: Any) -> list[RecommendationCandidate]:
+        if not isinstance(payload, list):
+            return []
+
+        candidates: list[RecommendationCandidate] = []
+        for item in payload:
+            if not isinstance(item, dict):
+                continue
+            title = str(item.get("title") or "").strip()
+            if not title:
+                continue
+
+            creator = (
+                item.get("creator")
+                or item.get("author")
+                or item.get("developer")
+                or item.get("director")
+                or item.get("studio")
+                or item.get("producer")
             )
-            return user_profile, candidates, message
+            creator_str = str(creator).strip() if creator else "未知创作者"
 
-        except (json.JSONDecodeError, KeyError, ValueError) as e:
-            logger.error(f"Failed to parse Selector response: {e}")
-            # Fallback to default values
-            default_profile = UserProfile(
-                genre="综合",
-                style="适中",
-                mood="探索",
-                previous_books=[],
-                reading_goal="阅读推荐",
+            metadata = item.get("metadata")
+            if not isinstance(metadata, dict):
+                metadata = {
+                    key: value
+                    for key, value in item.items()
+                    if key
+                    not in {
+                        "title",
+                        "creator",
+                        "author",
+                        "developer",
+                        "director",
+                        "studio",
+                        "producer",
+                    }
+                }
+
+            normalized_metadata = {
+                str(key): self._stringify_metadata_value(value)
+                for key, value in metadata.items()
+                if value is not None
+            }
+
+            candidates.append(
+                RecommendationCandidate(
+                    title=title,
+                    creator=creator_str,
+                    metadata=normalized_metadata,
+                )
             )
-            default_candidates = [
-                BookCandidate(title="默认推荐1", author="作者A", isbn=None),
-                BookCandidate(title="默认推荐2", author="作者B", isbn=None),
-            ]
-            default_message = "我理解您的需求了，让我为您推荐一些书籍。"
 
-            return default_profile, default_candidates, default_message
+        return candidates
+
+    def _normalize_value(self, value: Any) -> Any:
+        if isinstance(value, list):
+            return [self._stringify_metadata_value(v) for v in value if v is not None]
+        if isinstance(value, dict):
+            return {
+                str(key): self._stringify_metadata_value(val)
+                for key, val in value.items()
+            }
+        return self._stringify_metadata_value(value)
+
+    def _stringify_metadata_value(self, value: Any) -> str:
+        if isinstance(value, list):
+            return "、".join(
+                str(item).strip() for item in value if str(item).strip()
+            )
+        return str(value).strip()
+
+    def _extract_json(self, content: Any) -> dict[str, Any]:
+        if not isinstance(content, str):
+            return {}
+
+        text = content.strip()
+        if "```json" in text:
+            text = text.split("```json", maxsplit=1)[1].split("```", maxsplit=1)[0]
+        elif "```" in text:
+            text = text.split("```", maxsplit=1)[1].split("```", maxsplit=1)[0]
+
+        try:
+            data = json.loads(text)
+            if isinstance(data, dict):
+                return data
+        except json.JSONDecodeError as exc:
+            logger.error("Failed to decode selector JSON: %s", exc)
+        return {}
+
+    def _default_message(self) -> str:
+        label = THEME_LABELS.get(self.theme, "内容")
+        return f"我已经了解您的偏好，正在为您挑选合适的{label}。"
+
+    def _fallback(self) -> tuple[UserProfile, list[RecommendationCandidate], str]:
+        logger.warning("Selector falling back to default data for theme=%s", self.theme)
+        profile = UserProfile(
+            theme=self.theme,
+            summary=self._default_message(),
+            attributes={"偏好": ["多样化体验"], "心情": "探索新灵感"},
+        )
+        candidates = [
+            RecommendationCandidate(
+                title="默认推荐 A",
+                creator="系统推荐",
+                metadata={"备注": "等待真实数据"},
+            ),
+            RecommendationCandidate(
+                title="默认推荐 B",
+                creator="系统推荐",
+                metadata={"备注": "等待真实数据"},
+            ),
+        ]
+        return profile, candidates, self._default_message()

@@ -29,7 +29,10 @@
 | `/health` | GET | 健康检查 |
 | `/docs` | GET | Swagger UI 交互式文档 |
 | `/redoc` | GET | ReDoc API 文档 |
-| `/api/v1/recommendations` | POST | 获取图书推荐（核心功能） |
+| `/api/books/recommend` | POST | 生成书籍推荐 |
+| `/api/games/recommend` | POST | 生成游戏推荐 |
+| `/api/movies/recommend` | POST | 生成电影推荐 |
+| `/api/anime/recommend` | POST | 生成动漫推荐 |
 
 ---
 
@@ -80,9 +83,16 @@ curl http://localhost:8000/
 **响应**:
 ```json
 {
-    "message": "Book Recommendation API",
+    "message": "Multi-Theme Recommendation API",
     "docs": "/docs",
-    "health": "/health"
+    "health": "/health",
+    "themes": ["books", "games", "movies", "anime"],
+    "endpoints": {
+        "books": "/api/books/recommend",
+        "games": "/api/games/recommend",
+        "movies": "/api/movies/recommend",
+        "anime": "/api/anime/recommend"
+    }
 }
 ```
 
@@ -117,11 +127,13 @@ curl http://localhost:8000/health
 
 ---
 
-### 3. 获取图书推荐（核心 API）
+### 3. 获取多主题推荐（核心 API）
 
-**端点**: `POST /api/v1/recommendations`
+**端点**: `POST /api/{theme}/recommend`
 
-**描述**: 根据用户需求生成个性化图书推荐
+`{theme}` 可选值：`books`、`games`、`movies`、`anime`
+
+**描述**: 根据用户需求生成对应主题的个性化推荐
 
 #### 请求参数
 
@@ -205,7 +217,7 @@ curl http://localhost:8000/health
 
 **请求**:
 ```bash
-curl -X POST http://localhost:8000/api/v1/recommendations \
+curl -X POST http://localhost:8000/api/books/recommend \
   -H "Content-Type: application/json" \
   -d '{
     "user_message": "我想读一些科幻小说，最近读完了《三体》，想找类似风格的作品",
@@ -261,7 +273,7 @@ curl -X POST http://localhost:8000/api/v1/recommendations \
 
 **请求**:
 ```bash
-curl -X POST http://localhost:8000/api/v1/recommendations \
+curl -X POST http://localhost:8000/api/books/recommend \
   -H "Content-Type: application/json" \
   -d '{
     "user_message": "我更喜欢轻松一点的，不要太硬核",
@@ -357,7 +369,7 @@ class BookRecommendationClient:
         }
 
         response = self.session.post(
-            f"{self.base_url}/api/v1/recommendations",
+            f"{self.base_url}/api/books/recommend",
             json=payload
         )
         response.raise_for_status()
@@ -449,7 +461,7 @@ class BookRecommendationClient {
         request: RecommendationRequest
     ): Promise<RecommendationCard> {
         const response = await fetch(
-            `${this.baseUrl}/api/v1/recommendations`,
+            `${this.baseUrl}/api/books/recommend`,
             {
                 method: "POST",
                 headers: {
@@ -520,7 +532,7 @@ echo "=== 1. 健康检查 ==="
 curl -s "${BASE_URL}/health" | jq '.'
 
 echo -e "\n=== 2. 获取推荐 ==="
-curl -X POST "${BASE_URL}/api/v1/recommendations" \
+curl -X POST "${BASE_URL}/api/books/recommend" \
   -H "Content-Type: application/json" \
   -d '{
     "user_message": "我想读一些提升个人成长的书籍",
@@ -528,7 +540,7 @@ curl -X POST "${BASE_URL}/api/v1/recommendations" \
   }' | jq '.'
 
 echo -e "\n=== 3. 多轮对话示例 ==="
-curl -X POST "${BASE_URL}/api/v1/recommendations" \
+curl -X POST "${BASE_URL}/api/books/recommend" \
   -H "Content-Type: application/json" \
   -d '{
     "user_message": "有没有更偏向心理学方面的？",
@@ -657,7 +669,7 @@ import aiohttp
 async def get_recommendations_async(user_message: str):
     async with aiohttp.ClientSession() as session:
         async with session.post(
-            "http://localhost:8000/api/v1/recommendations",
+            "http://localhost:8000/api/books/recommend",
             json={"user_message": user_message}
         ) as response:
             return await response.json()
@@ -735,7 +747,7 @@ def get_cached_recommendations(user_message: str):
 ```json
 {
     "info": {
-        "name": "Book Recommendation API",
+        "name": "Multi-Theme Recommendation API",
         "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
     },
     "item": [
@@ -750,7 +762,7 @@ def get_cached_recommendations(user_message: str):
             "name": "Get Recommendations",
             "request": {
                 "method": "POST",
-                "url": "{{base_url}}/api/v1/recommendations",
+                "url": "{{base_url}}/api/books/recommend",
                 "header": [
                     {
                         "key": "Content-Type",

@@ -1,27 +1,34 @@
-import BookCard from './BookCard'
+import RecommendationCard from './RecommendationCard'
 import UserProfile from './UserProfile'
+import { THEME_CONFIG } from '../constants/themes'
 import './RecommendationCards.css'
 
-function RecommendationCards({ recommendations }) {
-  const { user_profile, recommended_books, message } = recommendations
+function RecommendationCards({ data }) {
+  const { user_profile, recommendations, message, theme } = data
+  const themeLabel = THEME_CONFIG[theme]?.label ?? '内容'
 
   return (
-    <div className="recommendations-container">
+    <section className="recommendations-container">
       <div className="recommendations-header">
-        <h2>📖 为您精选的推荐</h2>
+        <h2>✨ 为你定制的{themeLabel}推荐</h2>
         <UserProfile profile={user_profile} />
       </div>
 
-      <div className="books-grid">
-        {recommended_books.map((book, index) => (
-          <BookCard key={index} book={book} rank={index + 1} />
+      <div className="cards-grid">
+        {recommendations.map((item, index) => (
+          <RecommendationCard
+            key={item.title}
+            item={item}
+            rank={index + 1}
+            theme={theme}
+          />
         ))}
       </div>
 
       <div className="recommendations-message">
         <p>{message}</p>
       </div>
-    </div>
+    </section>
   )
 }
 

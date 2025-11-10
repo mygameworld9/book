@@ -1,23 +1,28 @@
 import axios from 'axios'
 
-// 创建axios实例
+const resolvedBaseURL =
+  import.meta.env.VITE_API_BASE_URL ||
+  (typeof window !== 'undefined' ? `${window.location.origin}` : 'http://localhost:8000')
+
 const apiClient = axios.create({
-  baseURL: import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000',
+  baseURL: resolvedBaseURL,
   headers: {
     'Content-Type': 'application/json',
   },
-  timeout: 120000, // 120秒超时（LLM调用可能较慢）
+  timeout: 120000,
 })
 
-/**
- * 获取图书推荐
- * @param {string} userMessage - 用户消息
- * @param {Array} conversationHistory - 对话历史
- * @returns {Promise<Object>} 推荐结果
- */
-export async function getRecommendations(userMessage, conversationHistory = []) {
+export async function getRecommendations(
+  theme,
+  userMessage,
+  conversationHistory = []
+) {
+  if (!theme) {
+    throw new Error('缺少推荐主题')
+  }
+  const endpoint = `/api/${theme}/recommend`
   try {
-    const response = await apiClient.post('/api/v1/recommendations', {
+    const response = await apiClient.post(endpoint, {
       user_message: userMessage,
       conversation_history: conversationHistory,
     })
@@ -28,10 +33,6 @@ export async function getRecommendations(userMessage, conversationHistory = []) 
   }
 }
 
-/**
- * 健康检查
- * @returns {Promise<Object>} 健康状态
- */
 export async function checkHealth() {
   try {
     const response = await apiClient.get('/health')

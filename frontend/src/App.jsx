@@ -1,69 +1,39 @@
-import { useState } from 'react'
-import ChatInterface from './components/ChatInterface'
-import RecommendationCards from './components/RecommendationCards'
+import ThemeSelector from './components/ThemeSelector'
+import ThemePage from './pages/ThemePage'
+import useThemeRouting from './hooks/useThemeRouting'
+import { THEME_CONFIG } from './constants/themes'
 import './App.css'
 
 function App() {
-  const [recommendations, setRecommendations] = useState(null)
-  const [loading, setLoading] = useState(false)
-  const [error, setError] = useState(null)
-
-  const handleRecommendation = (data) => {
-    setRecommendations(data)
-    setError(null)
-  }
-
-  const handleError = (err) => {
-    setError(err)
-    setRecommendations(null)
-  }
-
-  const handleLoading = (isLoading) => {
-    setLoading(isLoading)
-  }
+  const { theme, navigate } = useThemeRouting()
+  const themeInfo = THEME_CONFIG[theme]
 
   return (
-    <div className="app">
+    <div className={`app theme-${theme}`}>
       <header className="app-header">
-        <h1>📚 AI图书推荐系统</h1>
-        <p className="subtitle">基于多Agent协作的智能推荐</p>
+        <div>
+          <p className="eyebrow">LangChain Multi-Agent Playground</p>
+          <h1>
+            🌌 多主题智能推荐 <span>{themeInfo.label}</span>
+          </h1>
+          <p className="subtitle">
+            四大主题共享一套Agent框架，随时切换书籍、游戏、电影与动漫灵感。
+          </p>
+        </div>
+        <ThemeSelector currentTheme={theme} onSelect={navigate} />
       </header>
 
-      <main className="app-main">
-        <ChatInterface
-          onRecommendation={handleRecommendation}
-          onError={handleError}
-          onLoading={handleLoading}
-        />
-
-        {loading && (
-          <div className="loading">
-            <div className="spinner"></div>
-            <p>AI正在为您精心挑选书籍...</p>
-          </div>
-        )}
-
-        {error && (
-          <div className="error">
-            <h3>⚠️ 出错了</h3>
-            <p>{error}</p>
-          </div>
-        )}
-
-        {recommendations && !loading && (
-          <RecommendationCards recommendations={recommendations} />
-        )}
-      </main>
+      <ThemePage theme={theme} />
 
       <footer className="app-footer">
         <p>
-          🤖 Powered by LangChain Multi-Agent System |{' '}
+          🤖 Powered by FastAPI · LangChain · React |{' '}
           <a
             href="http://localhost:8000/docs"
             target="_blank"
             rel="noopener noreferrer"
           >
-            API文档
+            查看API文档
           </a>
         </p>
       </footer>

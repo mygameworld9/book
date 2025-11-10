@@ -1,149 +1,148 @@
-# 5分钟快速开始
+# 🚀 5 分钟快速启动（多主题推荐系统）
 
-这是一份超快速入门指南，让你在5分钟内运行起图书推荐系统。
+这份速查表帮助你在 5 分钟内跑通 **书籍 / 游戏 / 电影 / 动漫** 四主题推荐服务，并附带常见脚本。
 
-## 前置要求
+---
+
+## 0. 前置环境
 
 - ✅ Python 3.11+
-- ✅ uv (Python包管理器)
-- ✅ OpenAI API Key 或兼容的API
+- ✅ [uv](https://astral.sh/uv)（Python 依赖管理）
+- ✅ Node.js 18+（前端）
+- ✅ Docker & Docker Compose（可选，一键启动）
+- ✅ 有效的 OpenAI 兼容 API Key
 
-## 步骤 1: 克隆项目
+---
+
+## 1. 克隆 & 安装依赖
 
 ```bash
 git clone https://github.com/mygameworld9/book.git
 cd book
-```
 
-## 步骤 2: 安装依赖
-
-```bash
-# 安装uv (如果还没安装)
+# (可选) 安装 uv
 curl -LsSf https://astral.sh/uv/install.sh | sh
 
-# 安装项目依赖
+# 安装后端依赖
 uv sync --all-extras
-```
 
-## 步骤 3: 配置环境
-
-```bash
-# 复制环境变量模板
-cp .env.example .env
-
-# 编辑 .env 文件，添加你的API Key
-# 使用任何文本编辑器打开 .env
-# 修改这一行：
-# OPENAI_API_KEY=your_api_key_here
-```
-
-**最小配置示例** (.env):
-```bash
-OPENAI_API_KEY=sk-your-key-here
-OPENAI_API_BASE=https://api.openai.com/v1
-OPENAI_MODEL=gpt-4
-```
-
-## 步骤 4: 运行服务
-
-```bash
-uv run uvicorn src.main:app --reload
-```
-
-看到以下输出表示成功：
-```
-INFO:     Uvicorn running on http://127.0.0.1:8000 (Press CTRL+C to quit)
-INFO:     Started reloader process
-INFO:     Started server process
-INFO:     Waiting for application startup.
-INFO:     Application startup complete.
-```
-
-## 步骤 5: 测试API
-
-### 方法 1: 浏览器 (推荐)
-
-访问 http://localhost:8000/docs
-
-在Swagger UI中：
-1. 找到 `POST /api/v1/recommendations`
-2. 点击 "Try it out"
-3. 输入请求体：
-```json
-{
-    "user_message": "我想读一些科幻小说",
-    "conversation_history": []
-}
-```
-4. 点击 "Execute"
-5. 查看响应结果
-
-### 方法 2: cURL
-
-```bash
-curl -X POST http://localhost:8000/api/v1/recommendations \
-  -H "Content-Type: application/json" \
-  -d '{
-    "user_message": "我想读一些科幻小说",
-    "conversation_history": []
-  }'
-```
-
-### 方法 3: Python
-
-```python
-import requests
-
-response = requests.post(
-    "http://localhost:8000/api/v1/recommendations",
-    json={
-        "user_message": "我想读一些科幻小说",
-        "conversation_history": []
-    }
-)
-
-print(response.json())
-```
-
-## ✅ 成功！
-
-如果你看到了推荐结果，恭喜！系统已经成功运行。
-
-## 下一步
-
-- 📖 阅读 [完整项目指南](./PROJECT_OVERVIEW.md)
-- 🔌 查看 [API使用手册](./API_MANUAL.md)
-- 🤖 了解 [Agent工作原理](./AGENT_DETAILS.md)
-
-## 常见问题
-
-### Q: `uv: command not found`
-
-安装uv:
-```bash
-curl -LsSf https://astral.sh/uv/install.sh | sh
-# 重新打开终端
-```
-
-### Q: `ValidationError: openai_api_key field required`
-
-确保 `.env` 文件中配置了 `OPENAI_API_KEY`
-
-### Q: API返回 500 错误
-
-检查：
-1. API Key是否有效
-2. 是否有足够的配额
-3. 网络连接是否正常
-4. 查看终端日志获取详细错误
-
-### Q: 端口 8000 被占用
-
-使用其他端口：
-```bash
-uv run uvicorn src.main:app --reload --port 8001
+# 安装前端依赖
+cd frontend
+npm install
+cd ..
 ```
 
 ---
 
-**遇到其他问题?** 查看 [完整故障排查指南](./PROJECT_OVERVIEW.md#故障排查)
+## 2. 配置环境变量
+
+```bash
+cp .env.example .env
+# 编辑 .env，填入 OpenAI / Redis / API 端口等配置
+```
+
+最小示例：
+```env
+OPENAI_API_KEY=sk-xxxx
+OPENAI_API_BASE=https://api.openai.com/v1
+OPENAI_MODEL=gpt-4o-mini
+VITE_API_BASE_URL=http://localhost:8001
+```
+
+> **提示**：现在 `frontend/vite.config.js` 会自动读取仓库根目录的 `.env` 中所有 `VITE_` 开头的变量，因此只需维护一个 `.env` 文件即可让前后端共享 `VITE_API_BASE_URL`。若仍需要覆盖，可在 `frontend/.env.local` 中重新定义。
+
+---
+
+## 3. 启动服务
+
+### 方式 A：本地开发模式
+
+```bash
+# 1. 启动 Redis（后台）
+docker-compose up -d redis
+
+# 2. 启动 FastAPI
+uv run uvicorn src.main:app --reload
+# => http://localhost:8000
+
+# 3. 启动 React 前端
+cd frontend
+npm run dev
+# => http://localhost:3000
+```
+
+### 方式 B：Docker 一键启动
+
+```bash
+docker-compose up -d
+# 前端: http://localhost
+# 后端: http://localhost:8000
+```
+
+---
+
+## 4. 快速验证
+
+### Swagger
+
+打开 `http://localhost:8000/docs`，针对以下四个端点任选一个：
+
+```
+POST /api/books/recommend
+POST /api/games/recommend
+POST /api/movies/recommend
+POST /api/anime/recommend
+```
+
+示例请求体（书籍）：
+
+```json
+{
+  "user_message": "我想读一些硬核科幻小说",
+  "conversation_history": []
+}
+```
+
+### cURL
+
+```bash
+curl -X POST http://localhost:8000/api/games/recommend \
+  -H "Content-Type: application/json" \
+  -d '{
+    "user_message": "推荐 PS5 上剧情深度的动作游戏",
+    "conversation_history": []
+  }'
+```
+
+### 前端界面
+
+访问 `http://localhost:3000`（或 Docker 模式下的 `http://localhost`），通过顶部主题导航切换书籍/游戏/电影/动漫的对话与卡片输出。
+
+---
+
+## 5. 常用脚本
+
+| 操作 | 命令 |
+| --- | --- |
+| 后端测试 | `uv run pytest` |
+| 前端测试 | `cd frontend && npm run test -- --run` |
+| 静态检查 | `uv run mypy src` / `uv run ruff check src` |
+| 关闭 Docker | `docker-compose down` |
+
+---
+
+## 6. 常见问题
+
+1. **500 错误 / 推荐失败**  
+   - 检查 OpenAI API Key / Base / Model 是否正确  
+   - 确认网络可访问目标 LLM
+
+2. **端口被占用**  
+   - `uv run uvicorn src.main:app --reload --port 8001`
+
+3. **前端请求失败**  
+   - 检查 `VITE_API_BASE_URL` 是否指向后端
+
+---
+
+✅ 以上步骤全部执行成功后，你就拥有了一个完整运行的多主题推荐系统。若需了解更细节的 Agent 流程、CI/CD、部署方案，请继续阅读 `docs/PROJECT_OVERVIEW.md` 与 `docs/API_MANUAL.md`。***

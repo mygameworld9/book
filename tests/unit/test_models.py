@@ -1,152 +1,133 @@
-"""Unit tests for data models."""
+"""Unit tests for recommendation data models."""
 
 import pytest
 from pydantic import ValidationError
 
-from src.models.book import Book, BookCandidate, UserProfile
-from src.models.recommendation import RecommendationCard, RecommendationRequest
-
-
-class TestUserProfile:
-    """Tests for UserProfile model."""
-
-    def test_valid_user_profile(self) -> None:
-        """Test creating a valid user profile."""
-        profile = UserProfile(
-            genre="科幻",
-            style="硬核",
-            mood="渴望挑战",
-            previous_books=["三体", "沙丘"],
-            reading_goal="扩展科幻阅读视野",
-        )
-        assert profile.genre == "科幻"
-        assert profile.style == "硬核"
-        assert len(profile.previous_books) == 2
-
-    def test_user_profile_empty_previous_books(self) -> None:
-        """Test user profile with no previous books."""
-        profile = UserProfile(
-            genre="文学",
-            style="轻松",
-            mood="放松",
-            reading_goal="休闲阅读",
-        )
-        assert profile.previous_books == []
-
-
-class TestBookCandidate:
-    """Tests for BookCandidate model."""
-
-    def test_valid_book_candidate(self) -> None:
-        """Test creating a valid book candidate."""
-        book = BookCandidate(
-            title="流浪地球",
-            author="刘慈欣",
-            isbn="978-7-5086-5305-4",
-        )
-        assert book.title == "流浪地球"
-        assert book.author == "刘慈欣"
-
-    def test_book_candidate_without_isbn(self) -> None:
-        """Test book candidate without ISBN."""
-        book = BookCandidate(
-            title="基地",
-            author="阿西莫夫",
-        )
-        assert book.isbn is None
-
-
-class TestBook:
-    """Tests for Book model."""
-
-    def test_valid_book(self) -> None:
-        """Test creating a valid complete book."""
-        book = Book(
-            title="银河帝国",
-            author="阿西莫夫",
-            isbn="978-7-5366-8670-0",
-            summary="宏大的银河帝国兴衰史，展现人类文明的终极命运。",
-            recommendation_reason="适合喜欢硬核科幻的读者，思想深度极高。",
-        )
-        assert book.title == "银河帝国"
-        assert len(book.summary) > 0
-        assert len(book.recommendation_reason) > 0
+from src.models.recommendation import (
+    ConversationMessage,
+    RecommendationCard,
+    RecommendationCandidate,
+    RecommendationRequest,
+    RecommendationResponse,
+    UserProfile,
+)
 
 
 class TestRecommendationRequest:
-    """Tests for RecommendationRequest model."""
+    """Tests for the recommendation request model."""
 
-    def test_valid_recommendation_request(self) -> None:
-        """Test creating a valid recommendation request."""
+    def test_alias_user_message(self) -> None:
+        """Ensure user_message alias populates user_input."""
         request = RecommendationRequest(
-            user_message="我想读科幻小说",
-            conversation_history=[
-                {"role": "user", "content": "你好"},
-                {"role": "assistant", "content": "你好！我是图书推荐助手"},
-            ],
+            user_message="我想找硬核科幻小说",
+            conversation_history=[{"role": "assistant", "content": "你好"}],
         )
-        assert request.user_message == "我想读科幻小说"
-        assert len(request.conversation_history) == 2
+        assert request.user_input == "我想找硬核科幻小说"
+        assert isinstance(request.conversation_history[0], ConversationMessage)
 
-    def test_recommendation_request_empty_history(self) -> None:
-        """Test recommendation request with empty history."""
-        request = RecommendationRequest(user_message="推荐一本书")
+    def test_empty_history_default(self) -> None:
+        """Ensure conversation history defaults to empty list."""
+        request = RecommendationRequest(user_message="推荐电影")
         assert request.conversation_history == []
 
 
+class TestUserProfile:
+    """Tests for the user profile model."""
+
+    def test_accepts_mixed_attribute_types(self) -> None:
+        """Attributes can contain str, list, and dict values."""
+        profile = UserProfile(
+            theme="games",
+            summary="偏好开放世界的轻度探索体验",
+            attributes={
+                "类型": ["RPG", "动作"],
+                "心情": "放松",
+                "偏好": {"多人": "否", "时长": "中等"},
+            },
+        )
+        assert profile.attributes["类型"] == ["RPG", "动作"]
+        assert profile.attributes["偏好"]["多人"] == "否"  # type: ignore[index]
+
+
+class TestRecommendationCandidate:
+    """Tests for candidate items."""
+
+    def test_metadata_defaults(self) -> None:
+        """Metadata defaults to empty dict."""
+        candidate = RecommendationCandidate(title="沙丘", creator="弗兰克·赫伯特")
+        assert candidate.metadata == {}
+
+
 class TestRecommendationCard:
-    """Tests for RecommendationCard model."""
+    """Tests for final recommendation card."""
 
-    def test_valid_recommendation_card(self) -> None:
-        """Test creating a valid recommendation card."""
-        profile = UserProfile(
-            genre="科幻",
-            style="硬核",
-            mood="挑战",
-            reading_goal="学习",
-        )
-        books = [
-            Book(
-                title="沙丘",
-                author="弗兰克·赫伯特",
-                summary="沙漠星球上的权力斗争与人类进化的史诗。",
-                recommendation_reason="复杂的世界观和深刻的哲学思考。",
-            ),
-            Book(
-                title="神经漫游者",
-                author="威廉·吉布森",
-                summary="赛博朋克的开山之作，虚拟现实的先驱。",
-                recommendation_reason="开创性的科幻作品，影响深远。",
-            ),
-        ]
+    def test_extends_candidate(self) -> None:
+        """Card inherits title/creator metadata."""
         card = RecommendationCard(
-            user_profile=profile,
-            recommended_books=books,
-            message="为您精选了两本硬核科幻作品。",
+            title="沙丘",
+            creator="弗兰克·赫伯特",
+            metadata={"年份": "1965"},
+            summary="描绘厄拉科斯星球权力斗争与生态哲思的史诗级故事。",
+            reason="其宏大的世界观与哲思契合您对硬核科幻的期待。",
         )
-        assert len(card.recommended_books) == 2
-        assert card.user_profile.genre == "科幻"
+        assert card.metadata["年份"] == "1965"
 
-    def test_recommendation_card_min_books(self) -> None:
-        """Test recommendation card requires at least 2 books."""
-        profile = UserProfile(
-            genre="文学",
-            style="轻松",
-            mood="放松",
-            reading_goal="休闲",
-        )
-        books = [
-            Book(
-                title="活着",
-                author="余华",
-                summary="一个人一生的苦难与坚韧。",
-                recommendation_reason="深刻的人性洞察。",
-            ),
-        ]
-
+    def test_requires_minimum_summary_length(self) -> None:
+        """Summary shorter than 10 chars should raise validation error."""
         with pytest.raises(ValidationError):
             RecommendationCard(
-                user_profile=profile,
-                recommended_books=books,
-                message="推荐",
+                title="测试",
+                creator="测试者",
+                metadata={},
+                summary="太短",
+                reason="理由充足，符合需求。",
             )
+
+
+class TestRecommendationResponse:
+    """Tests for response envelope."""
+
+    def test_requires_two_recommendations(self) -> None:
+        """Response enforces min length of 2."""
+        profile = UserProfile(theme="books", attributes={"类型": ["科幻"]})
+        card = RecommendationCard(
+            title="银河帝国",
+            creator="阿西莫夫",
+            metadata={},
+            summary="描绘银河帝国兴衰与心理史学的硬核科幻经典叙事。",
+            reason="其宏大的时间尺度与逻辑推演满足你的思辨需求。",
+        )
+        with pytest.raises(ValidationError):
+            RecommendationResponse(
+                theme="books",
+                user_profile=profile,
+                recommendations=[card],
+                message="至少需要两条推荐。",
+            )
+
+    def test_valid_response(self) -> None:
+        """Ensure valid payload passes."""
+        profile = UserProfile(theme="movies", attributes={"风格": "烧脑"})
+        cards = [
+            RecommendationCard(
+                title="盗梦空间",
+                creator="克里斯托弗·诺兰",
+                metadata={"年份": "2010"},
+                summary="多层梦境交错推进，探讨现实与潜意识边界的科幻悬疑片。",
+                reason="复杂叙事结构契合你对烧脑体验的偏好。",
+            ),
+            RecommendationCard(
+                title="银翼杀手2049",
+                creator="丹尼斯·维伦纽瓦",
+                metadata={"年份": "2017"},
+                summary="冷峻未来主义视觉语言延续人类与复制人的身份拷问。",
+                reason="它的哲学思辨与视觉沉浸感满足你求知与审美双重需求。",
+            ),
+        ]
+        response = RecommendationResponse(
+            theme="movies",
+            user_profile=profile,
+            recommendations=cards,
+            message="祝你观影愉快！",
+        )
+        assert len(response.recommendations) == 2
