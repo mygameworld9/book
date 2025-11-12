@@ -87,9 +87,9 @@ class EssenceExtractorAgent(BaseAgent):
 
         entries: list[dict[str, Any]]
         if isinstance(data, dict) and "summaries" in data:
-            entries = data["summaries"]  # type: ignore[assignment]
+            entries = data["summaries"]
         elif isinstance(data, list):
-            entries = data  # type: ignore[assignment]
+            entries = data
         else:
             return {}
 

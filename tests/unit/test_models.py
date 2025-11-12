@@ -129,5 +129,7 @@ class TestRecommendationResponse:
             user_profile=profile,
             recommendations=cards,
             message="祝你观影愉快！",
+            request_id="test-request-id-123",
         )
         assert len(response.recommendations) == 2
+        assert response.request_id == "test-request-id-123"

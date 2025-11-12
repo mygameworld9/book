@@ -7,8 +7,8 @@ from typing import Any
 
 from src.agents.base import BaseAgent
 from src.models.recommendation import (
-    RecommendationCard,
     RecommendationCandidate,
+    RecommendationCard,
     RecommendationResponse,
     ThemeLiteral,
     UserProfile,
@@ -86,6 +86,7 @@ class AssemblerAgent(BaseAgent):
             user_profile=user_profile,
             recommendations=cards,
             message=message,
+            request_id="",  # Will be set by service layer
         )
 
         logger.info("Assembler successfully created recommendation response")

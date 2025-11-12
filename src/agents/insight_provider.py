@@ -95,9 +95,9 @@ class InsightProviderAgent(BaseAgent):
 
         entries: list[dict[str, Any]]
         if isinstance(data, dict) and "reasons" in data:
-            entries = data["reasons"]  # type: ignore[assignment]
+            entries = data["reasons"]
         elif isinstance(data, list):
-            entries = data  # type: ignore[assignment]
+            entries = data
         else:
             return {}
 

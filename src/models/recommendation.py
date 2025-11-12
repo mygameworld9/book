@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import uuid
 from typing import Literal
 
 from pydantic import BaseModel, ConfigDict, Field
@@ -28,6 +29,10 @@ class RecommendationRequest(BaseModel):
     conversation_history: list[ConversationMessage] = Field(
         default_factory=list,
         description="Previous conversation messages for additional context",
+    )
+    request_id: str = Field(
+        default_factory=lambda: str(uuid.uuid4()),
+        description="Unique identifier for tracking this request",
     )
 
     model_config = ConfigDict(populate_by_name=True)
@@ -88,3 +93,4 @@ class RecommendationResponse(BaseModel):
         description="List of 2-3 recommendation cards",
     )
     message: str = Field(..., description="Friendly assistant message to the user")
+    request_id: str = Field(..., description="Request ID for tracking")

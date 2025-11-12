@@ -36,6 +36,9 @@ class Settings(BaseSettings):
     api_port: int = 8000
     log_level: Literal["DEBUG", "INFO", "WARNING", "ERROR"] = "INFO"
 
+    # Workflow Configuration
+    workflow_timeout: float = 60.0  # Timeout in seconds for recommendation workflow
+
 
 def setup_logging(level: str = "INFO") -> None:
     """Configure application logging.

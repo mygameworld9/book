@@ -20,6 +20,42 @@ from src.services.recommendation_service import (
 logger = logging.getLogger(__name__)
 
 
+def _validate_configuration() -> None:
+    """Validate configuration at startup.
+
+    Raises:
+        ValueError: If configuration is invalid
+        FileNotFoundError: If required prompt files are missing
+    """
+    from pathlib import Path
+
+    # Validate OpenAI API key
+    if not settings.openai_api_key or settings.openai_api_key == "test-key-placeholder":
+        raise ValueError(
+            "OPENAI_API_KEY must be set in .env file. "
+            "Please copy .env.example to .env and configure your API key."
+        )
+
+    logger.info("Configuration validated: API key is set")
+
+    # Validate prompt files exist for all themes
+    prompts_dir = Path(__file__).resolve().parent / "prompts"
+    missing_prompts = []
+
+    for theme in SUPPORTED_THEMES:
+        for role in ["selector", "extractor", "insight", "assembler"]:
+            prompt_path = prompts_dir / theme / f"{role}.txt"
+            if not prompt_path.exists():
+                missing_prompts.append(str(prompt_path))
+
+    if missing_prompts:
+        raise FileNotFoundError(
+            "Missing prompt files:\n" + "\n".join(f"  - {p}" for p in missing_prompts)
+        )
+
+    logger.info("Prompt files validated: all %d files present", len(SUPPORTED_THEMES) * 4)
+
+
 @asynccontextmanager
 async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     """Application lifespan manager.
@@ -33,8 +69,18 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     # Startup
     setup_logging(settings.log_level)
     logger.info("Starting Multi-Theme Recommendation Service")
+
+    # Validate configuration
+    try:
+        _validate_configuration()
+    except (ValueError, FileNotFoundError) as exc:
+        logger.error("Configuration validation failed: %s", exc)
+        raise
+
     logger.info(f"Using model: {settings.openai_model}")
     logger.info(f"API base: {settings.openai_api_base}")
+    logger.info(f"Workflow timeout: {settings.workflow_timeout}s")
+    logger.info(f"Supported themes: {', '.join(SUPPORTED_THEMES)}")
 
     yield
 
@@ -93,11 +139,24 @@ async def health() -> dict[str, str]:
 async def _generate_recommendation(
     theme: str, request: RecommendationRequest
 ) -> RecommendationResponse:
+    from src.models.recommendation import ThemeLiteral
+
     if theme not in SUPPORTED_THEMES:
         raise HTTPException(status_code=404, detail=f"Unsupported theme: {theme}")
 
     try:
-        return await recommendation_service.get_recommendations(theme, request)
+        return await recommendation_service.get_recommendations(
+            theme,  # type: ignore[arg-type]
+            request,
+        )
+    except TimeoutError as exc:
+        logger.error(
+            "Request timeout: request_id=%s, theme=%s", request.request_id, theme
+        )
+        raise HTTPException(
+            status_code=504,
+            detail=f"Request timeout after {settings.workflow_timeout}s",
+        ) from exc
     except ValueError as exc:
         logger.error("Validation error while generating recommendations: %s", exc)
         raise HTTPException(status_code=400, detail=str(exc)) from exc

@@ -2,8 +2,8 @@
 
 from src.models.recommendation import (
     ConversationMessage,
-    RecommendationCard,
     RecommendationCandidate,
+    RecommendationCard,
     RecommendationRequest,
     RecommendationResponse,
     ThemeLiteral,

@@ -19,6 +19,9 @@ PROMPTS_DIR = Path(__file__).resolve().parents[1] / "prompts"
 class BaseAgent:
     """Abstract base class for all agents in the system."""
 
+    # Class-level prompt cache: (theme, role) -> prompt content
+    _prompt_cache: dict[tuple[str, str], str] = {}
+
     def __init__(
         self,
         *,
@@ -67,18 +70,33 @@ class BaseAgent:
     def load_prompt(self, role: str) -> str:
         """Load the system prompt for the given role and theme.
 
+        Uses class-level cache to avoid repeated file I/O.
+
         Args:
             role: Agent role name, e.g., selector, extractor
 
         Returns:
             Prompt content as string
         """
+        cache_key = (self.theme, role)
+
+        # Check cache first
+        if cache_key in self._prompt_cache:
+            logger.debug("Loading prompt from cache: theme=%s, role=%s", self.theme, role)
+            return self._prompt_cache[cache_key]
+
+        # Load from file and cache
         prompt_path = PROMPTS_DIR / self.theme / f"{role}.txt"
         if not prompt_path.exists():
             raise FileNotFoundError(
                 f"Prompt file not found for theme={self.theme}, role={role}"
             )
-        return prompt_path.read_text(encoding="utf-8")
+
+        prompt_content = prompt_path.read_text(encoding="utf-8")
+        self._prompt_cache[cache_key] = prompt_content
+        logger.info("Loaded and cached prompt: theme=%s, role=%s", self.theme, role)
+
+        return prompt_content
 
     async def process(self, *args: Any, **kwargs: Any) -> Any:
         """Process the agent's task.
