@@ -1,6 +1,21 @@
-# 图书推荐系统文档中心
+# 多主题推荐系统文档中心
 
-欢迎来到多Agent图书推荐系统的文档中心！这里提供了完整的项目文档，帮助你快速了解和使用本系统。
+欢迎来到多Agent多主题推荐系统的文档中心！这里提供了完整的项目文档，帮助你快速了解和使用本系统。
+
+## 📁 文档目录结构
+
+```
+docs/
+├── README.md                           # 本文件（文档索引）
+├── design/                             # 设计文档
+│   ├── book-recommendation-model.md   # 书籍推荐四步协同模型
+│   ├── multi-theme-extension.md       # 多主题扩展设计
+│   └── agents-implementation.md       # Agent 实现细节
+├── PROJECT_OVERVIEW.md                # 项目全面指南
+├── API_MANUAL.md                      # API 使用手册
+├── AGENT_DETAILS.md                   # Agent 工作原理详解
+└── archive/                            # 归档文件（不纳入版本控制）
+```
 
 ## 📚 文档导航
 
@@ -44,16 +59,63 @@
 **内容概览**:
 - 🤖 多Agent架构设计理念
 - 🔍 每个Agent的实现细节
-  - Selector (文学向导)
+  - Selector (向导)
   - EssenceExtractor (摘要撰写者)
-  - InsightProvider (图书推荐人)
-  - Assembler (在线图书管理员)
+  - InsightProvider (推荐人)
+  - Assembler (管理员)
 - 🎨 Prompt Engineering 技巧
 - 🔄 Agent协作流程分析
 - 🛠️ 扩展和自定义指南
 - 📊 性能优化建议
 
 **推荐阅读顺序**: 第三篇 - 深入理解系统时阅读
+
+---
+
+### 4. 🎯 设计文档 (`design/`)
+
+#### 4.1 [书籍推荐四步协同模型](./design/book-recommendation-model.md)
+**适合人群**: 产品设计师、系统架构师、新开发者
+
+**内容概览**:
+- 📚 书籍推荐的原始设计模型
+- 🔄 四步协同工作流程详解
+- 👥 每个 Agent 的角色定位和职责
+
+**推荐阅读顺序**: 了解核心设计理念
+
+---
+
+#### 4.2 [多主题扩展设计](./design/multi-theme-extension.md)
+**适合人群**: 产品设计师、技术架构师、全栈开发者
+
+**内容概览**:
+- 🎮 游戏推荐四步协同模型
+- 🎬 电影推荐四步协同模型
+- 🎨 动漫推荐四步协同模型
+- 🔧 技术实现要点（提示词配置、API 结构、前端路由）
+- 📝 数据库扩展方案
+- 📋 完整实施检查清单
+
+**推荐阅读顺序**: 了解多主题扩展架构
+
+**关键特性**:
+- 四个主题（书籍、游戏、电影、动漫）共享 Agent 框架
+- 每个主题通过替换提示词实现差异化
+- 提供完整的前后端实施指南
+
+---
+
+#### 4.3 [Agent 实现细节](./design/agents-implementation.md)
+**适合人群**: 后端开发者、AI 工程师
+
+**内容概览**:
+- 🏗️ BaseAgent 基类设计
+- 🔌 LangChain 集成方案
+- 🛠️ 各 Agent 的具体实现
+- ⚠️ 错误处理机制
+
+**推荐阅读顺序**: 开发和调试 Agent 时参考
 
 ---
 

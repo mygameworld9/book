@@ -61,6 +61,12 @@ Thumbs.db
 # Temporary files
 *.tmp
 *.bak
+*.tar.gz
+*.b64
+*.json.backup
+
+# Archive
+docs/archive/
 
 # Claude Code
 .claude/
