@@ -139,7 +139,6 @@ async def health() -> dict[str, str]:
 async def _generate_recommendation(
     theme: str, request: RecommendationRequest
 ) -> RecommendationResponse:
-    from src.models.recommendation import ThemeLiteral
 
     if theme not in SUPPORTED_THEMES:
         raise HTTPException(status_code=404, detail=f"Unsupported theme: {theme}")

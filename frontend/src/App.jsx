@@ -27,14 +27,19 @@ function App() {
 
       <footer className="app-footer">
         <p>
-          🤖 Powered by FastAPI · LangChain · React |{' '}
-          <a
-            href="http://localhost:8000/docs"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            查看API文档
-          </a>
+          🤖 Powered by FastAPI · LangChain · React
+          {import.meta.env.VITE_SHOW_API_DOCS === 'true' && (
+            <>
+              {' | '}
+              <a
+                href={`${import.meta.env.VITE_API_BASE_URL}/docs`}
+                target="_blank"
+                rel="noopener noreferrer"
+              >
+                查看API文档
+              </a>
+            </>
+          )}
         </p>
       </footer>
     </div>

@@ -188,7 +188,7 @@ class SelectorAgent(BaseAgent):
                 )
             )
 
-        return candidates
+        return candidates[:3]  # 最多返回3个推荐
 
     def _normalize_value(self, value: Any) -> Any:
         if isinstance(value, list):

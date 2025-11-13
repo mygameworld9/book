@@ -9,9 +9,10 @@ WORKDIR /app
 COPY --from=ghcr.io/astral-sh/uv:latest /uv /usr/local/bin/uv
 
 # Copy dependency files
-COPY pyproject.toml ./
+COPY pyproject.toml uv.lock README.md ./
 
-# Install dependencies
+# Install dependencies with increased timeout
+ENV UV_HTTP_TIMEOUT=300
 RUN uv sync --no-dev --no-editable
 
 # Stage 2: Runtime
